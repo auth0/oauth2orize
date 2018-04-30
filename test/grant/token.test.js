@@ -60,7 +60,7 @@ describe('grant.token', function() {
         expect(out.state).to.equal('f1o1o1');
       });
     });
-    
+
     describe('request with scope', function() {
       var err, out;
       
@@ -352,7 +352,41 @@ describe('grant.token', function() {
         expect(response.getHeader('Location')).to.equal('http://example.com/auth/callback#access_token=xyz&token_type=Bearer');
       });
     });
-    
+
+    describe('transaction with ms-app long callback', function() {
+      var response;
+
+      before(function(done) {
+        function issue(client, user, done) {
+          if (client.id !== 'c123') { return done(new Error('incorrect client argument')); }
+          if (user.id !== 'u123') { return done(new Error('incorrect user argument')); }
+
+          return done(null, 'xyz');
+        }
+
+        chai.oauth2orize.grant(token(issue))
+          .txn(function(txn) {
+            txn.client = { id: 'c123', name: 'Example' };
+            txn.redirectURI = 'ms-app://1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890/auth/callback';
+            txn.req = {
+              redirectURI: 'ms-app://1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890/auth/callback'
+            };
+            txn.user = { id: 'u123', name: 'Bob' };
+            txn.res = { allow: true };
+          })
+          .end(function(res) {
+            response = res;
+            done();
+          })
+          .decide();
+      });
+
+      it('should respond', function() {
+        expect(response.statusCode).to.equal(302);
+        expect(response.getHeader('Location')).to.equal('ms-app://1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890-1234567890/auth/callback#access_token=xyz&token_type=Bearer');
+      });
+    });
+
     describe('transaction with request state', function() {
       var response;
       
